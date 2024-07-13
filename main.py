@@ -6,50 +6,78 @@ from src.pipeline import Pipeline, PipelineMode
 from prometheus_client import start_http_server
 import concurrent.futures
 import time
+from src.data_package import DataPackage
 
 # Start up the server to expose the metrics.
 start_http_server(8000)
 
 # Example custom modules
 class DataValidationModule(ExecutionModule):
-    def execute(self, data):
+    def execute(self, data_package) -> DataPackage:
+        data = data_package.data
         if isinstance(data, dict) and "key" in data:
-            return True, "Validation succeeded", data
-        return False, "Validation failed: key missing", data
+            data_package.success = True
+            data_package.message = "Validation succeeded"
+            data_package.data = data
+        else:
+            data_package.success = False
+            data_package.message = "Validation failed: key missing"
+            data_package.data = data
+
+        return data_package
 
 class DataTransformationModule(ExecutionModule):
     def __init__(self):
         super().__init__(ModuleOptions(
             use_mutex=False,
-            timeout=2.0
+            timeout=20.0
         ))
 
-    def execute(self, data):
+    def execute(self, data_package: DataPackage) -> DataPackage:
+        data = data_package.data
         list1 = [1, 2, 3, 4, 5, 6]
         randomint = random.choice(list1)
         time.sleep(randomint)
         if "key" in data:
             data["key"] = data["key"].upper()
-            return True, "Transformation succeeded", data
-        return False, "Transformation failed: key missing", data
+            data_package.success = True
+            data_package.message = "Transformation succeeded"
+            data_package.data = data
+        else:
+            data_package.success = False
+            data_package.message = "Transformation failed: key missing"
+            data_package.data = data
+
+        return data_package
 
 class DataConditionModule(ConditionModule):
-    def condition(self, data):
+    def condition(self, data_package: DataPackage) -> bool:
+        data = data_package.data
         return "condition" in data and data["condition"] == True
 
 class SuccessModule(ExecutionModule):
-    def execute(self, data):
+    def execute(self, data_package: DataPackage) -> DataPackage:
+        data = data_package.data
         data["status"] = "success"
-        return True, "Condition true: success", data
+        data_package.success = True
+        data_package.message = "Condition true: success"
+        data_package.data = data
+        return data_package
 
 class FailureModule(ExecutionModule):
-    def execute(self, data):
+    def execute(self, data_package: DataPackage) -> DataPackage:
+        data = data_package.data
         data["status"] = "failure"
-        return True, "Condition false: failure", data
+        data_package.success = True
+        data_package.message = "Condition false: failure"
+        data_package.data = data
+        return data_package
 
 class AlwaysTrue(ExecutionModule):
-    def execute(self, data):
-        return True, "Always true", data
+    def execute(self, data_package: DataPackage) -> DataPackage:
+        data_package.success = True
+        data_package.message = "Always true"
+        return data_package
 
 # Setting up the processing pipeline
 pre_modules = [DataValidationModule()]

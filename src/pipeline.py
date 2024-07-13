@@ -39,7 +39,7 @@ class PipelineProcessingPhase:
         """
         return self._name
 
-    def run(self, data_package: DataPackage) -> Tuple[bool, str, DataPackage]:
+    def run(self, data_package: DataPackage) -> DataPackage:
         """
         Executes the pipeline processing phase with the given data package.
         Args:
@@ -47,17 +47,21 @@ class PipelineProcessingPhase:
         Returns:
             Tuple[bool, str, DataPackage]: Success flag, message, and the processed data package.
         """
-        data = data_package.data
         for module in self._modules:
             try:
-                success, message, return_data = module.run(data)
-                if not success:
-                    return False, f"Module {module.get_name()} failed: {message}", data_package
+                new_data_package = module.run(data_package)
+                if not new_data_package.success:
+                    new_data_package.success = False
+                    new_data_package.message = f"Module {module.get_name()} failed: {new_data_package.message}"
+                    return new_data_package
             except Exception as e:
-                return False, f"Module {module.get_name()} failed with error: {e}", data_package
+                new_data_package.success = False
+                new_data_package.message = f"Module {module.get_name()} failed with error: {e}"
+                return new_data_package
 
-        data_package.data = return_data
-        return True, f"Modules {module.get_name()} succeeded", data_package
+        new_data_package.success = True
+        new_data_package.message = f"Modules {module.get_name()} succeeded"
+        return new_data_package
 
 
 class PipelineExecutor:
@@ -106,7 +110,7 @@ class PipelineExecutor:
             raise ValueError("Sequence number cannot be greater or equal than the next sequence number or smaller than the last finished sequence number.")
         self._last_finished_sequence_number = sequence_number
 
-    def run(self, pipeline_processing_phases: List[PipelineProcessingPhase], sequence_number: int) -> Tuple[bool, str, DataPackage]:
+    def run(self, pipeline_processing_phases: List[PipelineProcessingPhase], sequence_number: int) -> DataPackage:
         """
         Executes the pipeline process with the given data package.
         Args:
@@ -118,14 +122,25 @@ class PipelineExecutor:
         with self._lock:
             data_package = self._data_packages.get(sequence_number)
             if not data_package:
-                return False, f"Data package with sequence number {sequence_number} not found. First add data with add_data(data: Any)", None
+                return DataPackage(
+                    id="",
+                    pipeline_executer_id="",
+                    sequence_number=-1,
+                    success=False,
+                    message=f"Data package with sequence number {sequence_number} not found. First add data with add_data(data: DataPackage)",
+                    data=None
+                )
 
         for phase in pipeline_processing_phases:
-            success, message, result = phase.run(data_package)
-            if not success:
-                return False, f"Pipeline {self._name} failed: {message}", result
+            new_data_package = phase.run(data_package)
+            if not new_data_package.success:
+                new_data_package.success = False
+                new_data_package.message = f"Pipeline {self._name} failed: {new_data_package.message}"
+                return new_data_package
 
-        return True, "All pipeline phases succeeded", result
+        new_data_package.success = True
+        new_data_package.message = "All pipeline phases succeeded"
+        return new_data_package
 
     def add_data(self, data: Any) -> DataPackage:
         """
@@ -309,9 +324,9 @@ class Pipeline:
             with self._lock:
                 pipeline_processing_phases = [self._pre_modules, self._main_modules, self._post_modules]
 
-            success, message, result = executor.run(pipeline_processing_phases, data_package.sequence_number)
-            if not success:
-                error_callback(message, result)
+            new_data_package = executor.run(pipeline_processing_phases, data_package.sequence_number)
+            if not new_data_package.success:
+                error_callback(new_data_package.message, new_data_package.data)
                 PIPELINE_PROCESSING_COUNTER.labels(pipeline_name=self._name).dec()
                 return
 

@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 import threading
-from typing import Any, Dict, List, Tuple, final, NamedTuple
+from typing import Dict, List, Tuple, final, NamedTuple
 import time
 import uuid
 from prometheus_client import Gauge, Summary
@@ -53,7 +53,7 @@ class Module(ABC):
         return self._locks[id(self)]
 
     @final
-    def run(self, data) -> Tuple[bool, str, Any]:
+    def run(self, data_package: DataPackage) -> DataPackage:
         """
         Wrapper method that executes the module's main logic within a thread-safe context.
         Measures and records the execution time and waiting time.
@@ -68,8 +68,8 @@ class Module(ABC):
         start_time = time.time()
         
         # Create a thread to execute the execute method
-        result_container: Dict[str, (Tuple[bool, str, Any])]  = {}
-        execute_thread = threading.Thread(target=self._execute_with_result, args=(data, result_container))
+        result_container: Dict[str, DataPackage]  = {}
+        execute_thread = threading.Thread(target=self._execute_with_result, args=(data_package, result_container))
         execute_thread.start()
         execute_thread.join(self._timeout)
 
@@ -78,38 +78,35 @@ class Module(ABC):
                 self._mutex.release()
             raise TimeoutError(f"Execution of module {self._name} timed out after {self._timeout} seconds.")
 
-        success, message, data = result_container['result']
+        new_data_package = result_container['result']
         REQUEST_PROCESSING_TIME.labels(module_name=self.__class__.__name__).observe(time.time() - start_time)
-        
-        if not success:
-            if self._use_mutex:
-                self._mutex.release()
-            return False, message, data
         
         if self._use_mutex:
             self._mutex.release()
         REQUEST_TOTAL_TIME.labels(module_name=self.__class__.__name__).observe(time.time() - start_total_time)
         
-        return success, message, data
+        return new_data_package
 
 
-    def _execute_with_result(self, data, result_container):
+    def _execute_with_result(self, data_package: DataPackage, result_container: Dict[str, DataPackage]) -> None:
         """
         Helper method to execute the `execute` method and store the result in a container.
         """
         REQUEST_PROCESSING_COUNTER.labels(module_name=self.__class__.__name__).inc()
         try:
-            result_container['result'] = self.execute(data)
+            result_container['result'] = self.execute(data_package)
         except Exception as e:
-            result_container['result'] = (False, str(e), None)
+            data_package.success = False
+            data_package.message = str(e)
+            result_container['result'] = data_package
         finally:
             REQUEST_PROCESSING_COUNTER.labels(module_name=self.__class__.__name__).dec()
 
     @abstractmethod
-    def execute(self, data) -> Tuple[bool, str, Any]:
+    def execute(self, data: DataPackage) -> Tuple[bool, str, DataPackage]:
         """
         Abstract method to be implemented by subclasses.
-        Performs an operation on the data input and returns a tuple (bool, str, Any).
+        Performs an operation on the data input and returns a DataPackage.
         """
         pass
 
@@ -121,7 +118,7 @@ class ExecutionModule(Module, ABC):
     Abstract class for modules that perform specific execution tasks.
     """
     @abstractmethod
-    def execute(self, data) -> Tuple[bool, str, Any]:
+    def execute(self, data_package: DataPackage) -> DataPackage:
         """
         Method to be implemented by subclasses for specific execution logic.
         """
@@ -138,25 +135,25 @@ class ConditionModule(Module, ABC):
         self.false_module = false_module
 
     @abstractmethod
-    def condition(self, data) -> bool:
+    def condition(self, data: DataPackage) -> bool:
         """
         Abstract method to be implemented by subclasses to evaluate conditions based on data input.
         """
         return True
 
     @final
-    def execute(self, data) -> Tuple[bool, str, Any]:
+    def execute(self, data_package: DataPackage) -> DataPackage:
         """
         Executes the true_module if condition is met, otherwise executes the false_module.
         """
-        if self.condition(data):
+        if self.condition(data_package):
             try:
-                return self.true_module.run(data)
+                return self.true_module.run(data_package)
             except Exception as e:
                 raise Exception(f"True module failed with error: {str(e)}")
         else:
             try:
-                return self.false_module.run(data)
+                return self.false_module.run(data_package)
             except Exception as e:
                 raise Exception(f"False module failed with error: {str(e)}")
 
@@ -170,16 +167,14 @@ class CombinationModule(Module):
         self.modules = modules
     
     @final
-    def execute(self, data) -> Tuple[bool, str, Any]:
+    def execute(self, data_package: DataPackage) -> DataPackage:
         """
         Executes each module in the list sequentially, passing the output of one as the input to the next.
         """
-        result_data = data
+        result_data = data_package
         for i, module in enumerate(self.modules):
             try:
-                result, result_message, result_data = module.run(result_data)
-                if not result:
-                    return False, result_message, result_data
+                new_data_package = module.run(result_data)
             except Exception as e:
                 raise Exception(f"Combination module {i} ({module.__class__.__name__}) failed with error: {str(e)} and data: {result_data}")
-        return True, "", result_data
+        return new_data_package
