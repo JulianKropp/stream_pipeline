@@ -78,7 +78,27 @@ class DataPackage:
     running: bool = False
     success: bool = True
     message: str = ""
-    error: Any = None  # TODO: Change to Error
+    error: Optional[Union[Exception, Error]] = None # This will only be needed if init an obj with error
+    _error: Optional[Error] = field(default=None, init=False)
+
+    def __post_init__(self): # This will set error of the init obj to _error
+        self.error = self.error  # This will trigger the setter
+        # Remove self.error from the __dict__ to avoid recursion
+        if 'error' in self.__dict__:
+            del self.__dict__['error']
+
+    @property
+    def error(self) -> Optional[Error]:
+        return self._error
+
+    @error.setter
+    def error(self, value: Union[Exception, Error, None]) -> None:
+        if isinstance(value, Exception):
+            self._error = exception_to_error(value)
+        elif isinstance(value, Error):
+            self._error = value
+        else:
+            self._error = None
 
     # Immutable attributes
     _immutable_attributes: List[str] = field(default_factory=lambda: 
@@ -114,7 +134,7 @@ class DataPackage:
         else:
             return super().__getattribute__(name)
 
-    def __setattribute__(self, name: str, value: Any):
+    def __setattr__(self, name: str, value: Any):
         if name.startswith('_'):
             with self._mutex:
                 super().__setattr__(name, value)
@@ -237,6 +257,8 @@ def main():
         success=True,
         error=ValueError("An example error")
     )
+
+    dpm.error = ValueError("Another example error")
 
     print(dpm.error)
 
