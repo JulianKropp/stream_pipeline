@@ -5,7 +5,7 @@ import threading
 import traceback
 from dataclasses import dataclass, field
 from types import TracebackType
-from typing import Any, Dict, List, NamedTuple, Optional
+from typing import Any, Dict, List, NamedTuple, Optional, Union
 
 @dataclass
 class Error:
@@ -22,7 +22,7 @@ class Error:
     module_versions: Optional[Dict[str, str]] = field(default_factory=dict)
 
     def __str__(self) -> str:
-        return "TODO!!!"
+        return json_error_handler_str(self)
 
 class ErrorLoggerOptions(NamedTuple):
     exc_type: bool = True
@@ -119,8 +119,11 @@ def exception_to_error(exc: BaseException) -> Error:
 
     return error
 
-def json_error_handler_dict(exc: BaseException) -> Dict[str, str]:
-    error_obj = exception_to_error(exc)
+def json_error_handler_dict(exc: Union[BaseException, Error]) -> Dict[str, str]:
+    if isinstance(exc, BaseException):
+        error_obj = exception_to_error(exc)
+    else:
+        error_obj = exc
 
     error_logger = ErrorLogger()
     options = error_logger.get_options()
@@ -155,10 +158,14 @@ def json_error_handler_dict(exc: BaseException) -> Dict[str, str]:
 
     return minimal_error_info
 
-# Custom JSON error handler
-def json_error_handler(exc: BaseException) -> None:
+def json_error_handler_str(exc: Union[BaseException, Error]) -> str:
     minimal_error_info = json_error_handler_dict(exc) 
     error_json = json.dumps(minimal_error_info, indent=4)
+    return error_json
+
+# Custom JSON error handler
+def json_error_handler(exc: Union[BaseException, Error]) -> None:
+    error_json = json_error_handler_str(exc)
     print(error_json)
 
 # Set the custom error handler for uncaught exceptions
