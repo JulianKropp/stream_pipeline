@@ -1,0 +1,64 @@
+syntax = "proto3";
+
+package data;
+
+// Error message definition
+message Error {
+    string type = 1;
+    string message = 2;
+    repeated string traceback = 3;
+    string thread = 4;
+    string start_context = 5;
+    int64 thread_id = 6;
+    bool is_daemon = 7;
+    map<string, string> local_vars = 8;
+    map<string, string> global_vars = 9;
+    map<string, string> environment_vars = 10;
+    map<string, string> module_versions = 11;
+}
+
+// DataPackageModule message definition
+message DataPackageModule {
+    string module_id = 1;
+    float start_time = 2;
+    float end_time = 3;
+    float waiting_time = 4;
+    float processing_time = 5;
+    float total_time = 6;
+    bool success = 7;
+    Error error = 8;
+}
+
+// DataPackage message definition
+message DataPackage {
+    string id = 1;
+    string pipeline_id = 2;
+    string pipeline_executer_id = 3;
+    int32 sequence_number = 4;
+    repeated DataPackageModule modules = 5;
+    bytes data = 6;
+    bool running = 7;
+    bool success = 8;
+    string message = 9;
+    Error error = 10;
+}
+
+service ModuleService {
+  rpc run (DataPackage) returns (DataPackage);
+}
+
+
+// // ErrorLoggerOptions message definition
+// message ErrorLoggerOptions {
+//     bool exc_type = 1;
+//     bool message = 2;
+//     bool traceback = 3;
+//     bool thread = 4;
+//     bool start_context = 5;
+//     bool thread_id = 6;
+//     bool is_daemon = 7;
+//     bool local_vars = 8;
+//     bool global_vars = 9;
+//     bool environment_vars = 10;
+//     bool module_versions = 11;
+// }

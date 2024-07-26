@@ -5,9 +5,13 @@ import threading
 from typing import Any, Dict, List, Tuple, Union, final, NamedTuple
 import time
 import uuid
+import grpc
 from prometheus_client import Gauge, Summary
 
-from .data_package import DataPackage, DataPackageModule
+from . import data_pb2
+from . import data_pb2_grpc
+
+from .data_package import DataPackage, DataPackageModule, grpc_to_normal, normal_to_grpc
 from .error import Error, exception_to_error
 
 # Metrics to track time spent on processing modules
@@ -225,3 +229,22 @@ class CombinationModule(Module):
                 new_error = type(e)(f"Combination module {i} ({module.__class__.__name__}) failed with error: {str(e)}")
                 data.error = new_error
                 break
+
+class ExternalModule(Module):
+    """
+    Class for a module that runs on a different server. Using gRPC for communication.
+    """
+    def __init__(self, host: str, port: int, options: ModuleOptions = ModuleOptions(), name: str = ""):
+        super().__init__(options, name)
+        self.host: str = host
+        self.port: int = port
+
+    @final
+    def execute(self, data: DataPackage) -> None:
+        address = f"{self.host}:{self.port}"
+        with grpc.insecure_channel(address) as channel:
+            stub = data_pb2_grpc.ModuleServiceStub(channel)
+            data_grpc = normal_to_grpc(data, data_pb2.DataPackage, data_pb2.DataPackageModule, data_pb2.Error) # type: ignore
+            response = stub.run(data_grpc)
+
+            grpc_to_normal(response, data)

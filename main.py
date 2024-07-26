@@ -1,7 +1,7 @@
 # main.py
 import random
 import threading
-from src.module_classes import ExecutionModule, ConditionModule, CombinationModule, Module, ModuleOptions, DataPackage
+from src.module_classes import ExecutionModule, ConditionModule, CombinationModule, ExternalModule, Module, ModuleOptions, DataPackage
 from src.pipeline import Pipeline, PipelineMode
 from prometheus_client import start_http_server
 import concurrent.futures
@@ -66,7 +66,9 @@ class AlwaysTrue(ExecutionModule):
         data.message = "Always true"
 
 # Setting up the processing pipeline
-pre_modules: list[Module] = [DataValidationModule()]
+pre_modules: list[Module] = [
+    ExternalModule("localhost", 50051), 
+    DataValidationModule()]
 main_modules: list[Module] = [
     DataTransformationModule(),
     DataConditionModule(SuccessModule(), FailureModule()),
