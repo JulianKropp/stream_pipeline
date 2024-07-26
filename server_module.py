@@ -1,4 +1,4 @@
-import grpc
+import grpc # type: ignore
 from concurrent import futures
 import time
 from typing import Generator
@@ -10,7 +10,7 @@ from src import data_pb2  # Correct import statement
 from src import data_pb2_grpc  # Correct import statement
 
 class ModuleServiceServicer(data_pb2_grpc.ModuleServiceServicer):
-    def run(self, request: data_pb2.DataPackage, context: grpc.ServicerContext) -> data_pb2.DataPackage:
+    def run(self, request: data_pb2.DataPackage, context: grpc.ServicerContext) -> data_pb2.DataPackage: # type: ignore
         try:
             try:
                 raise ValueError("This is a test error")
@@ -25,7 +25,7 @@ class ModuleServiceServicer(data_pb2_grpc.ModuleServiceServicer):
             request.message = "This is a test message"
             request.error = testerror
 
-            data_grpc = normal_to_grpc(request, data_pb2.DataPackage, data_pb2.DataPackageModule, data_pb2.Error)
+            data_grpc = normal_to_grpc(request, data_pb2.DataPackage, data_pb2.DataPackageModule, data_pb2.Error) # type: ignore
         except Exception as e:
             print(exception_to_error(e))
 

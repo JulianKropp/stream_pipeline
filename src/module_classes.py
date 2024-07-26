@@ -5,7 +5,7 @@ import threading
 from typing import Any, Dict, List, Tuple, Union, final, NamedTuple
 import time
 import uuid
-import grpc
+import grpc # type: ignore
 from prometheus_client import Gauge, Summary
 
 from . import data_pb2
