@@ -339,8 +339,10 @@ class Pipeline:
                             error_callback(data_package.data)
             
             except Exception as e:
+                print("CRITICAL ERROR")
+                executor.remove_data(data_package.sequence_number)
                 data_package.success = False
-                data_package.error = e
+                data_package.errors.append(e)
                 if error_callback:
                     error_callback(data_package)
                 

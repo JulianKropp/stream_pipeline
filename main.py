@@ -1,7 +1,7 @@
 # main.py
 import random
 import threading
-from src.module_classes import ExecutionModule, ConditionModule, CombinationModule, ExternalModule, Module, ModuleOptions, DataPackage
+from src.module_classes import ExecutionModule, ConditionModule, CombinationModule, Module, ModuleOptions, DataPackage
 from src.pipeline import Pipeline, PipelineMode
 from prometheus_client import start_http_server
 import concurrent.futures
@@ -67,7 +67,6 @@ class AlwaysTrue(ExecutionModule):
 
 # Setting up the processing pipeline
 pre_modules: list[Module] = [
-    ExternalModule("localhost", 50051), 
     DataValidationModule()]
 main_modules: list[Module] = [
     DataTransformationModule(),
@@ -94,7 +93,8 @@ def callback(processed_data: DataPackage):
 
 def error_callback(processed_data: DataPackage):
     global counter, counter_mutex
-    print(f"ERROR: {processed_data}, data: {processed_data.data}: {processed_data.error}")
+    # print(f"ERROR: {processed_data}, data: {processed_data.data}: {processed_data.errors}")
+    print(f"ERROR: {processed_data.message}")
     with counter_mutex:
         counter = counter + 1
 

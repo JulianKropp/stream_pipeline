@@ -149,7 +149,7 @@ class DataPackage(ThreadSafeClass):
         data (Any):                             The actual data contained in the package.
         success (bool):                         Indicates if the process was successful. If not successful, the error attribute should be set.
         message (str):                          Info message.
-        errors Union[Error, Exception]]:        Error that occurred during the processing of the data package.
+        errors (List[Union[Error, Exception]]): List of errors that occurred during the processing of the data package.
     """
     pipeline_id: str = ""
     pipeline_executer_id: str = ""
@@ -160,7 +160,7 @@ class DataPackage(ThreadSafeClass):
     running: bool = False
     success: bool = True
     message: str = ""
-    error: Union[Error, Exception, None] = None
+    errors: List[Union[Error, Exception, None]] = field(default_factory=list)
 
     def __post_init__(self):
         self._immutable_attributes = ['id', 'pipeline_id', 'pipeline_executer_id']

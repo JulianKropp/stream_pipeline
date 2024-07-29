@@ -20,13 +20,15 @@ message Error {
 // DataPackageModule message definition
 message DataPackageModule {
     string module_id = 1;
-    float start_time = 2;
-    float end_time = 3;
-    float waiting_time = 4;
-    float processing_time = 5;
-    float total_time = 6;
-    bool success = 7;
-    Error error = 8;
+    bool running = 2;
+    float start_time = 3;
+    float end_time = 4;
+    float waiting_time = 5;
+    float processing_time = 6;
+    float total_time = 7;
+    bool success = 8;
+    Error error = 9;
+    repeated DataPackageModule sub_modules = 10;
 }
 
 // DataPackage message definition
